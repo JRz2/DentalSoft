@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,18 +7,252 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role{
+// ==================== ENUMS ====================
+enum Role {
   ADMIN
   DOCTOR
-  PATIENT
 }
 
-model User{
-  id        Int       @id @default(autoincrement())
-  name      String 
-  email     String    @unique
-  password  String
-  role      Role      @default(PATIENT)
-  createAt  DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+enum TreatmentType {
+  DIAGNOSIS
+  PREVENTIVE
+  RESTORATIVE
+  ENDODONTIC
+  PERIODONTAL
+  ORTHODONTIC
+  SURGICAL
+  PROSTHETIC
+  AESTHETIC
+  MAINTENANCE
+}
+
+enum TreatmentStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ==================== MODELOS DE AUTENTICACIÓN ====================
+model User {
+  id             Int       @id @default(autoincrement())
+  name           String
+  email          String    @unique
+  password       String
+  role           Role      @default(DOCTOR)
+  
+  // Datos profesionales
+  specialty      String?   // Especialidad del doctor
+  licenseNumber  String?   @unique // Registro médico
+  
+  // Estado y seguridad
+  isActive       Boolean   @default(true)
+  emailVerified  Boolean   @default(false)
+  deletedAt      DateTime?
+  
+  // Información adicional
+  phoneNumber    String?
+  
+  // Auditoría
+  createdBy      Int?
+  updatedBy      Int?
+  lastLoginAt    DateTime?
+  
+  // Timestamps
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relaciones
+  sessions       Session[]
+  auditLogs      AuditLog[]
+  loginAttempts  LoginAttempt[]
+  patients       Patient[]   // Doctores que registraron pacientes
+  appointments   Appointment[]
+  
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  expiresAt    DateTime
+  userAgent    String?
+  ipAddress    String?
+  isRevoked    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id            Int      @id @default(autoincrement())
+  email         String
+  userId        Int?
+  user          User?    @relation(fields: [userId], references: [id])
+  success       Boolean
+  ipAddress     String?
+  userAgent     String?
+  failureReason String?
+  createdAt     DateTime @default(now())
+  
+  @@index([email])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+// ==================== MODELOS DE NEGOCIO ====================
+model Patient {
+  id                Int      @id @default(autoincrement())
+  fullName          String
+  phoneNumber       String
+  email             String?
+  birthDate         DateTime
+  address           String?
+  medicalRecordNum  String   @unique
+  
+  // Datos odontológicos
+  dentalHistory     String?
+  habits            String?
+  medicalConditions String?
+  
+  // Registro
+  registeredBy      Int
+  doctor            User     @relation(fields: [registeredBy], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relaciones
+  clinicalHistory   ClinicalHistory?
+  appointments      Appointment[]
+  
+  @@index([fullName])
+  @@index([phoneNumber])
+  @@index([registeredBy])
+  @@index([medicalRecordNum])
+}
+
+model ClinicalHistory {
+  id                Int      @id @default(autoincrement())
+  patientId         Int      @unique
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  
+  odontogram        Json?
+  medicalHistory    String?
+  allergies         String?
+  observations      String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relaciones
+  treatments        Treatment[]
+  
+  @@index([patientId])
+}
+
+model Treatment {
+  id                Int      @id @default(autoincrement())
+  clinicalHistoryId Int
+  clinicalHistory   ClinicalHistory @relation(fields: [clinicalHistoryId], references: [id])
+  
+  name              String
+  description       String?
+  type              TreatmentType
+  estimatedSessions Int
+  status            TreatmentStatus @default(PLANNED)
+  
+  startDate         DateTime @default(now())
+  endDate           DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relaciones
+  sessions          TreatmentSession[]
+  
+  @@index([clinicalHistoryId])
+  @@index([status])
+}
+
+model TreatmentSession {
+  id                Int      @id @default(autoincrement())
+  treatmentId       Int
+  treatment         Treatment @relation(fields: [treatmentId], references: [id])
+  
+  sessionNumber     Int
+  description       String
+  notes             String?
+  procedures        Json?
+  
+  appointmentId     Int      @unique
+  appointment       Appointment @relation(fields: [appointmentId], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([treatmentId])
+  @@index([appointmentId])
+  @@index([sessionNumber])
+}
+
+model Appointment {
+  id                Int      @id @default(autoincrement())
+  patientId         Int
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  doctorId          Int
+  doctor            User     @relation(fields: [doctorId], references: [id])
+  
+  appointmentDate   DateTime
+  duration          Int      @default(30)
+  status            AppointmentStatus @default(SCHEDULED)
+  treatmentSession  TreatmentSession?
+  
+  reason            String
+  diagnosis         String?
+  notes             String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([appointmentDate])
+  @@index([status])
+  @@index([appointmentDate, doctorId])
 }
