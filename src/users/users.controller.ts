@@ -4,11 +4,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from '../auth/roles/roles.guard';
-import { Roles } from '../auth/roles/roles.decorator';
-import { Permissions } from '../auth/permissions/permissions.decorator';
-import { Permission } from '../auth/permissions/auth.permissions.enum';
-  
+import { RolesGuard } from '../common/guards/roles.guard';
+
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 
 @Controller('users')
@@ -20,10 +17,8 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-  @Roles('Role.USER')
   @Get()
-  @Permissions(Permission.GET_USERS)
-  findAll() { 
+  findAll() {
     return this.usersService.findAll();
   }
 

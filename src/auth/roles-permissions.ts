@@ -13,7 +13,4 @@ export const rolePermissions: Record<Role, Permission[]> = {
     Permission.CREATE_APPOINTMENT,
     Permission.VIEW_APPOINTMENT,
   ],
-  PATIENT: [
-    Permission.VIEW_APPOINTMENT,
-  ],
 };

@@ -156,7 +156,8 @@ model Patient {
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
+  deletedAt         DateTime?
+
   // Relaciones
   clinicalHistory   ClinicalHistory?
   appointments      Appointment[]
